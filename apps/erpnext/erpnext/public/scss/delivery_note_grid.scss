@@ -1,0 +1,12 @@
+.form-grid .grid-body {
+  overflow-x: auto;
+}
+
+.form-grid .grid-static-col,
+.form-grid .grid-input-col {
+  white-space: nowrap;
+}
+
+.form-grid .grid-row:hover {
+  background: #f5f7fa;
+}
