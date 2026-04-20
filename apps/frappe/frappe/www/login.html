@@ -1,0 +1,880 @@
+{% extends "templates/web.html" %}
+
+{% macro email_login_body() -%}
+{% if not disable_user_pass_login or (ldap_settings and ldap_settings.enabled) %}
+<div class="page-card-body">
+   <h2>Đăng nhập</h2>
+   <p class="muted"></p>
+
+   <div class="form-group">
+       <label class="form-label" for="login_email">Tài khoản</label>
+       <input type="text" id="login_email" class="form-control"
+           placeholder="{% if login_name_placeholder %}{{ login_name_placeholder  }}{% else %}{{ _('Nhập tài khoản') }}{% endif %}"
+           required autofocus autocomplete="username">
+   </div>
+
+   <div class="form-group">
+       <label class="form-label" for="login_password">{{ _("Mật khẩu") }}</label>
+       <div class="password-field">
+           <input type="password" id="login_password" class="form-control" placeholder="Nhập mật khẩu"
+               autocomplete="current-password" required>
+           <span toggle="#login_password" class="toggle-password text-muted">{{ _('Xem') }}</span>
+       </div>
+   </div>
+
+   <!-- <div class="login-options">
+       <label class="remember-label">
+           <input type="checkbox" name="remember" /> {{ _("Ghi nhớ đăng nhập") }}
+       </label>
+       <a href="#forgot" class="forgot-link">{{ _("Quên mật khẩu?") }}</a>
+   </div> -->
+</div>
+{% endif %}
+<div class="page-card-actions">
+   {% if not disable_user_pass_login %}
+   <button class="btn btn-primary btn-login" type="submit">
+       {{ _("Đăng nhập") }}</button>
+   {% endif %}
+   {% if ldap_settings and ldap_settings.enabled %}
+   <button class="btn btn-secondary btn-login btn-ldap-login">
+       {{ _("Login with LDAP") }}</button>
+   {% endif %}
+   {% if not disable_signup and not disable_user_pass_login %}
+   <a href="#signup" class="btn btn-ghost">{{ _("Tạo tài khoản") }}</a>
+   {% endif %}
+</div>
+<div class="form-footer">
+   {% if not disable_signup and not disable_user_pass_login %}
+   <span>{{ _("Chưa có tài khoản?") }} <a href="#signup" class="signup-link">{{ _("Đăng ký ngay") }}</a></span>
+   {% endif %}
+</div>
+{% endmacro %}
+
+{% block head_include %}
+<!-- {{ include_style('login.bundle.css') }} -->
+
+<style>
+    /* Design từ loginGPT.html - chuyên nghiệp */
+    :root {
+        --bg: #f7f9fc;
+        --card: #ffffff;
+        --primary: #ff469e;
+        --muted: #6b7280;
+        --radius: 12px;
+    }
+    
+    * {
+        font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    
+    body {
+        margin: 0;
+        background: linear-gradient(180deg, #fbfbff 0%, var(--bg) 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        transform: scale(1.1);
+        transform-origin: center center;
+        overflow-x: hidden;
+    }
+    
+    /* Layout chính 2 cột - zoom 110% */
+    .wrap {
+        width: 100%;
+        max-width: 1320px;  /* 1200px * 1.1 */
+        background: transparent;
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 44px;          /* 40px * 1.1 */
+        align-items: center;
+        min-height: 660px;  /* 600px * 1.1 */
+    }
+    
+    /* Hero section bên trái - zoom 110% */
+    .hero {
+        position: relative;
+        padding: 44px;      /* 40px * 1.1 */
+        border-radius: var(--radius);
+        background: linear-gradient(135deg, rgba(255, 70, 158, 0.06), rgba(79, 70, 229, 0.03));
+        overflow: hidden;
+        min-height: 572px;  /* 520px * 1.1 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: url('/files/pattern-curve-seven.png">') no-repeat center center/cover;;
+        opacity: 0.4;
+    }
+    
+    .hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: url('/files/banner-img.png') no-repeat center right/contain;
+        opacity: 0.9;
+    }
+    
+    .brand {
+        position: relative;
+        z-index: 1;
+        max-width: 100%;
+        text-align: left;
+    }
+    
+    .hero h1 {
+        margin: 0 0 18px;   /* 16px * 1.1 */
+        font-size: 31px;    /* 28px * 1.1 */
+        color: #0f172a;
+        line-height: 1.2;
+        font-weight: 700;
+    }
+    
+    .hero p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 18px;    /* 16px * 1.1 */
+        line-height: 1.5;
+    }
+    
+    /* Card form bên phải - zoom 110% */
+    .login-content {
+        background: var(--card);
+        padding: 31px;      /* 28px * 1.1 */
+        border-radius: var(--radius);
+        box-shadow: 0 8px 30px rgba(17, 24, 39, 0.06);
+        min-height: 500px;  /* Đảm bảo chiều cao tối thiểu */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    
+    /* For-login section - bỏ padding cho rộng ra */
+    .for-login {
+        padding: 0;
+        margin: 0;
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .for-login .login-content {
+        width: 100%;
+        max-width: 70%;      /* Giảm từ 95% xuống 70% */
+        min-width: 450px;    /* Giảm từ 600px xuống 450px */
+        padding: 44px 66px;  /* Giảm padding ngang từ 88px xuống 66px */
+        margin: 0;
+        box-sizing: border-box;
+    }
+    
+    .page-card-head h4 {
+        margin: 0 0 11px;   /* 10px * 1.1 */
+        font-size: 22px;    /* 20px * 1.1 */
+        color: #0f172a;
+    }
+    
+    .page-card-head img {
+        filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+        max-height: 66px;   /* 60px * 1.1 */
+        width: auto;
+        object-fit: contain;
+    }
+    
+    .page-card-head {
+        text-align: center;
+        margin-bottom: 22px; /* 20px * 1.1 */
+        padding-top: 60px;   /* Thêm padding-top */
+    }
+    
+    /* Form styling từ loginGPT - zoom 110% */
+    .page-card-body h2 {
+        margin: 0 0 11px;   /* 10px * 1.1 */
+        font-size: 22px;    /* 20px * 1.1 */
+        color: #0f172a;
+    }
+    
+    .page-card-body .muted {
+        color: var(--muted);
+        font-size: 14px;    /* 13px * 1.1 */
+        margin-bottom: 18px; /* 16px * 1.1 */
+    }
+    
+    .form-label {
+        display: block;
+        margin-top: 15px;   /* 14px * 1.1 */
+        margin-bottom: 9px; /* 8px * 1.1 */
+        font-size: 14px;    /* 13px * 1.1 */
+        color: var(--muted);
+        font-weight: 500;
+    }
+    
+    /* Form styling - tăng độ rộng input - zoom 110% */
+    .form-control {
+        width: 100%;         /* Thay đổi về 100% theo loginGPT */
+        max-width: none;     /* Bỏ max-width */
+        padding: 13px 15px;  /* 12px 14px * 1.1 */
+        margin-top: 9px;     /* 8px * 1.1 */
+        border: 1px solid #e6e9ef;
+        border-radius: 11px; /* 10px * 1.1 */
+        font-size: 15px;     /* 14px * 1.1 */
+        margin-left: 0;      /* Bỏ margin-left */
+        box-sizing: border-box;
+    }
+    
+    /* Đảm bảo form group có width phù hợp */
+    .form-group {
+        width: 100%;
+        display: block;      /* Thay đổi từ flex về block */
+        margin-bottom: 16px; /* Thêm margin-bottom */
+    }
+    
+    /* Login options styling - từ loginGPT */
+    .login-options {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 11px;    /* 10px * 1.1 */
+        margin-bottom: 18px; /* 16px * 1.1 */
+    }
+    
+    .remember-label {
+        display: flex;
+        align-items: center;
+        gap: 9px;           /* 8px * 1.1 */
+        font-size: 14px;    /* 13px * 1.1 */
+        color: var(--muted);
+        margin: 0;
+    }
+    
+    .forgot-link {
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;    /* 13px * 1.1 */
+    }
+    
+    .forgot-link:hover {
+        color: #e63946;
+    }
+    
+    .email-field, .password-field {
+        width: 100%;         /* Thay đổi về 100% */
+        max-width: none;     /* Bỏ max-width */
+        margin-left: 0;      /* Bỏ margin-left */
+        position: relative;
+    }
+    
+    /* Bỏ icon styling vì loginGPT không dùng icon */
+    
+    /* Thêm padding-left cho input khi có icon */
+    .password-field .form-control {
+        padding-right: 60px; /* Để chỗ cho toggle password */
+    }
+    
+    /* Toggle password styling */
+    .toggle-password {
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--muted);
+        z-index: 2;
+    }
+    
+    .toggle-password:hover {
+        color: var(--primary);
+    }
+    
+    /* Button styling từ loginGPT - zoom 110% */
+    .page-card-actions {
+        margin-top: 20px;    /* 18px * 1.1 */
+        display: flex;
+        gap: 13px;          /* 12px * 1.1 */
+        align-items: center;
+    }
+    
+    .btn-primary {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+        padding: 13px 18px; /* 12px 16px * 1.1 */
+        border-radius: 11px; /* 10px * 1.1 */
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        font-size: 15px;    /* 14px * 1.1 */
+    }
+    
+    .btn-ghost {
+        background: transparent;
+        color: var(--primary);
+        border: 1px solid rgba(255, 70, 158, 0.12);
+        padding: 13px 18px; /* 12px 16px * 1.1 */
+        border-radius: 11px; /* 10px * 1.1 */
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 15px;    /* 14px * 1.1 */
+    }
+    
+    .btn-secondary {
+        background: #6b7280;
+        border-color: #6b7280;
+        color: #fff;
+        padding: 13px 18px;
+        border-radius: 11px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        font-size: 15px;
+    }
+    
+    .btn-primary:hover {
+        background: #475782;
+        border-color: #475782;
+    }
+    
+    .btn-ghost:hover {
+        background: rgba(255, 70, 158, 0.06);
+    }
+    
+    /* Form footer styling từ loginGPT */
+    .form-footer {
+        margin-top: 13px;    /* 12px * 1.1 */
+        font-size: 14px;     /* 13px * 1.1 */
+        color: var(--muted);
+        text-align: center;
+    }
+    
+    .signup-link {
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 600;
+    }
+    
+    .signup-link:hover {
+        color: #e63946;
+    }
+    
+    /* Social login styling - giữ nguyên phần cũ nhưng cập nhật cho phù hợp */
+    .social-login-buttons .btn {
+        border-radius: 11px; /* 10px * 1.1 */
+        border: 1px solid rgba(255, 70, 158, 0.12);
+        width: 100%;
+        margin-top: 8px;
+        box-sizing: border-box;
+        padding: 13px 18px;
+        font-size: 15px;
+    }
+    
+    .social-login-buttons {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .login-button-wrapper {
+        width: 100%;
+    }
+    
+    .muted {
+        color: var(--muted);
+        font-size: 13px;
+    }
+    
+    /* Responsive - tối ưu cho nhiều kích thước màn hình */
+    
+    /* Large desktop (1440px+) - bỏ padding for-login - zoom 110% */
+    @media (min-width: 1440px) {
+        .wrap {
+            max-width: 1452px;  /* 1320px * 1.1 */
+            grid-template-columns: 1.4fr 0.6fr;
+            gap: 66px;          /* 60px * 1.1 */
+        }
+        
+        .hero {
+            min-height: 660px;  /* 600px * 1.1 */
+            padding: 55px;      /* 50px * 1.1 */
+        }
+        
+        .hero h1 {
+            font-size: 40px;    /* 36px * 1.1 */
+        }
+        
+        .for-login {
+            padding: 0;
+        }
+        
+        .for-login .login-content {
+            max-width: 68%;      /* Giảm từ 90% xuống 68% */
+            min-width: 485px;    /* Giảm từ 650px xuống 485px */
+            padding: 66px 82px;  /* Giảm padding từ 110px xuống 82px */
+        }
+        
+        /* Form controls cho large desktop - cập nhật theo loginGPT */
+        .form-control, .btn-primary, .social-login-buttons .btn {
+            width: 100%;
+            max-width: none;
+            margin-left: 0;
+        }
+        
+        .email-field, .password-field, .login-button-wrapper {
+            width: 100%;
+            max-width: none;
+            margin-left: 0;
+        }
+    }
+    
+    /* Standard desktop (1024px - 1439px) - bỏ padding for-login - zoom 110% */
+    @media (min-width: 1024px) and (max-width: 1439px) {
+        .wrap {
+            max-width: 1210px;  /* 1100px * 1.1 */
+            grid-template-columns: 1.3fr 0.7fr;
+        }
+        
+        .hero h1 {
+            font-size: 35px;    /* 32px * 1.1 */
+        }
+        
+        .for-login {
+            padding: 0;
+        }
+        
+        .for-login .login-content {
+            max-width: 71%;      /* Giảm từ 95% xuống 71% */
+            min-width: 435px;    /* Giảm từ 580px xuống 435px */
+            padding: 55px 66px;  /* Giảm padding từ 88px xuống 66px */
+        }
+        
+        /* Form controls cho standard desktop - cập nhật theo loginGPT */
+        .form-control, .btn-primary, .social-login-buttons .btn {
+            width: 100%;
+            max-width: none;
+            margin-left: 0;
+        }
+        
+        .email-field, .password-field, .login-button-wrapper {
+            width: 100%;
+            max-width: none;
+            margin-left: 0;
+        }
+    }
+    
+    /* Tablet landscape (768px - 1023px) - bỏ padding for-login */
+    @media (min-width: 768px) and (max-width: 1023px) {
+        .wrap {
+            max-width: 900px;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        .hero {
+            min-height: 400px;
+            padding: 30px;
+        }
+        
+        .hero h1 {
+            font-size: 24px;
+        }
+        
+        .for-login {
+            padding: 0;
+        }
+        
+        .for-login .login-content {
+            max-width: 74%;      /* Giảm từ 98% xuống 74% */
+            min-width: 375px;    /* Giảm từ 500px xuống 375px */
+            padding: 40px 45px;  /* Giảm padding từ 60px xuống 45px */
+        }
+        
+        /* Form controls cho tablet landscape - cập nhật theo loginGPT */
+        .form-control, .btn-primary, .social-login-buttons .btn {
+            width: 100%;
+            max-width: none;
+            margin-left: 0;
+        }
+        
+        .email-field, .password-field, .login-button-wrapper {
+            width: 100%;
+            max-width: none;
+            margin-left: 0;
+        }
+    }
+    
+    /* Tablet portrait & mobile (max-width: 767px) - bỏ padding for-login */
+    @media (max-width: 767px) {
+        body {
+            padding: 16px;
+        }
+        
+        .wrap {
+            grid-template-columns: 1fr;
+            max-width: 100%;
+            gap: 20px;
+            min-height: auto;
+        }
+        
+        .hero {
+            min-height: 250px;
+            padding: 24px;
+            text-align: center;
+            order: 1;
+        }
+        
+        .hero h1 {
+            font-size: 22px;
+            margin-bottom: 8px;
+        }
+        
+        .hero p {
+            font-size: 14px;
+        }
+        
+        .for-login {
+            order: 2;
+            padding: 0;
+        }
+        
+        .for-login .login-content {
+            max-width: 100%;
+            min-width: auto;     /* Bỏ min-width cho mobile */
+            padding: 30px 24px;  /* Tăng padding một chút */
+        }
+        
+        /* Form controls cho mobile - giữ 100% */
+        .form-control, .btn-primary, .social-login-buttons .btn {
+            width: 100%;
+            max-width: 100%;
+            margin-left: 0;
+        }
+        
+        .email-field, .password-field, .login-button-wrapper {
+            width: 100%;
+            max-width: 100%;
+            margin-left: 0;
+        }
+        
+        .page-card-head h4 {
+            font-size: 18px;
+        }
+    }
+    
+    /* Small mobile (max-width: 480px) - bỏ padding for-login */
+    @media (max-width: 480px) {
+        body {
+            padding: 12px;
+        }
+        
+        .hero {
+            min-height: 200px;
+            padding: 20px 16px;
+        }
+        
+        .hero h1 {
+            font-size: 20px;
+        }
+        
+        .for-login {
+            padding: 0;
+        }
+        
+        .for-login .login-content {
+            max-width: 100%;
+            padding: 25px 15px;
+        }
+        
+        /* Form controls cho small mobile */
+        .form-control, .btn-primary, .social-login-buttons .btn {
+            width: 100%;
+            max-width: 100%;
+            margin-left: 0;
+        }
+        
+        .email-field, .password-field, .login-button-wrapper {
+            width: 100%;
+            max-width: 100%;
+            margin-left: 0;
+        }
+        
+        .form-control {
+            padding: 10px 12px;
+            font-size: 16px; /* Prevent zoom on iOS */
+        }
+        
+        .btn-primary {
+            padding: 14px 16px;
+            font-size: 16px;
+        }
+    }
+    /* Tối ưu tổng thể: Bỏ scale trên mobile để tránh vỡ layout */
+@media (max-width: 767px) {
+    body {
+        transform: none !important; /* Quan trọng: Bỏ phóng to 110% */
+        padding: 0;
+        background: #ffffff; /* Nền trắng cho sạch sẽ trên mobile */
+        display: block; /* Trôi tự động theo chiều dọc */
+    }
+
+    .wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        max-width: 100%;
+        min-height: 100vh;
+    }
+
+    /* Ẩn Hero Section trên mobile để tránh rối mắt, hoặc hiện đơn giản */
+    .hero {
+        display: none; /* Thông thường mobile nên ẩn để người dùng đăng nhập ngay */
+    }
+
+    .for-login {
+        width: 100%;
+        height: auto;
+        padding: 20px 15px;
+    }
+
+    /* Căn chỉnh lại Card đăng nhập */
+    .for-login .login-content {
+        max-width: 100%;
+        min-width: 0;
+        padding: 20px;
+        box-shadow: none; /* Bỏ đổ bóng để trông phẳng, hiện đại hơn */
+        border: none;
+    }
+
+    /* Logo nhỏ lại một chút */
+    .page-card-head img {
+        max-height: 50px;
+        margin-bottom: 10px;
+    }
+
+    /* Phóng to input để người dùng dễ chạm/gõ */
+    .form-control {
+        font-size: 16px !important; /* Tránh iOS tự động zoom khi focus */
+        padding: 15px;
+        border-radius: 8px;
+    }
+
+    .btn-primary, .btn-ghost, .btn-secondary {
+        width: 100%;
+        padding: 15px;
+        font-size: 16px;
+        margin-top: 10px;
+    }
+
+    .page-card-actions {
+        flex-direction: column; /* Nút bấm xếp chồng lên nhau */
+        gap: 10px;
+    }
+
+    /* Footer text */
+    .form-footer {
+        margin-top: 25px;
+        padding-bottom: 30px;
+    }
+}/* Kết thúc tối ưu cho mobile */
+    /* Ẩn các elements không cần thiết trong layout mới */
+    .for-signup, .for-email-login, .for-forgot, .for-login-with-email-link {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% macro logo_section(title=null) %}
+<div class="page-card-head">
+   <img class="app-logo" src="/files/logo-two.png" alt="D-erp Logo">
+   {% if title %}
+   <h4>{{ _(title)}}</h4>
+   {% else %}
+   <!-- <h4>{{ _('Login to {0}').format(_("D-erp")) }}</h4> -->
+   {% endif %}
+</div>
+{% endmacro %}
+
+{% block page_content %}
+<!-- {{ for_test }} -->
+<div class="wrap">
+   <noscript>
+       <div class="text-center my-5">
+           <!-- <h4>{{ _("Javascript is disabled on your browser") }}</h4> -->
+           <p class="text-muted">
+               <!-- {{ _("You need to enable JavaScript for your app to work.") }}<br>{{ _("To enable it follow the instructions in the following link: {0}").format("<a href='https://enable-javascript.com/'>enable-javascript.com</a></p>") }} -->
+       </div>
+   </noscript>
+   
+   <!-- Hero section bên trái -->
+   <div class="hero">
+       <div class="brand">
+           <!-- <h1>{{ _('Welcome to {0}').format(_("D-erp")) }}</h1> -->
+           <!-- <p>{{ _("Hệ thống quản lý doanh nghiệp thông minh và hiện đại. Đăng nhập để trải nghiệm các tính năng mạnh mẽ.") }}</p> -->
+       </div>
+   </div>
+   
+   <!-- Form đăng nhập bên phải -->
+   <section class='for-login'>
+       {{ logo_section() }}
+       <div class="login-content page-card">
+           <form class="form-signin form-login" role="form">
+               {%- if social_login or login_with_email_link -%}
+               <div class="page-card-body">
+                   {{ email_login_body() }}
+                   <div class="social-logins text-center">
+                       {% if not disable_user_pass_login or (ldap_settings and ldap_settings.enabled) %}
+                       <!-- <p class="text-muted login-divider">{{ _("or") }}</p> -->
+                       {% endif %}
+                       <div class="social-login-buttons">
+                           {% for provider in provider_logins %}
+                           <div class="login-button-wrapper">
+                               <a href="{{ provider.auth_url }}"
+                                   class="btn btn-block btn-default btn-sm btn-login-option btn-{{ provider.name }}">
+                                   {% if provider.icon %}
+                                       {{ provider.icon }}
+                                   {% endif %}
+                                   {{ _("Login with {0}").format(provider.provider_name) }}</a>
+                           </div>
+                           {% endfor %}
+                       </div>
+                       {% if login_with_email_link %}
+                       <!-- <div class="login-with-email-link social-login-buttons">
+                           <div class="login-button-wrapper">
+                               <a href="#login-with-email-link"
+                                   class="btn btn-block btn-default btn-sm btn-login-option btn-login-with-email-link">
+                                   {{ _("Login with Email Link") }}</a>
+                           </div>
+                       </div> -->
+                       {% endif %}
+                   </div>
+               </div>
+               {% else %}
+                   {{ email_login_body() }}
+               {%- endif -%}
+           </form>
+       </div>
+       {%- if not disable_signup and not disable_user_pass_login -%}
+       <div class="text-center sign-up-message">
+           {{ _("Don't have an account?") }}
+           <a href="#signup">{{ _("Sign up") }}</a>
+       </div>
+       {%- endif -%}
+   </section>
+</div>
+
+   {%- if social_login -%}
+   <section class='for-email-login'>
+       {{ logo_section() }}
+       <div class="login-content page-card">
+           <form class="form-signin form-login" role="form">
+           {{ email_login_body() }}
+           </form>
+       </div>
+       {%- if not disable_signup and not disable_user_pass_login -%}
+       <div class="text-center sign-up-message">
+           {{ _("Don't have an account?") }}
+           <a href="#signup">{{ _("Sign up") }}</a>
+       </div>
+       {%- endif -%}
+   </section>
+   {%- endif -%}
+   <section class='for-signup {{ "signup-disabled" if disable_signup else "" }}'>
+       {{ logo_section(_('Create a {0} Account').format(_("D-erp"))) }}
+       <div class="login-content page-card">
+           {%- if not disable_signup -%}
+           {{ signup_form_template }}
+           {%- else -%}
+           <div class='page-card-head mb-2'>
+               <span class='indicator gray'>{{_("Signup Disabled")}}</span>
+               <p class="text-muted text-normal sign-up-message mt-1 mb-8">{{_("Signups have been disabled for this website.")}}</p>
+               <div><a href='/' class='btn btn-primary btn-md'>{{ _("Home") }}</a></div>
+           </div>
+           {%- endif -%}
+       </div>
+
+   </section>
+
+   <!-- <section class='for-forgot'>
+       {{ logo_section('Forgot Password') }}
+       <div class="login-content page-card">
+           <form class="form-signin form-forgot hide" role="form">
+               <div class="page-card-body">
+                   <div class="email-field">
+                       <input type="email" id="forgot_email" class="form-control"
+                           placeholder="{{ _('Email Address') }}" required autofocus autocomplete="username">
+                       <svg class="field-icon email-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"
+                           xmlns="http://www.w3.org/2000/svg">
+                           <path
+                               d="M2.5 7.65149V15.0757C2.5 15.4374 2.64367 15.7842 2.8994 16.04C3.15513 16.2957 3.50198 16.4394 3.86364 16.4394H16.1364C16.498 16.4394 16.8449 16.2957 17.1006 16.04C17.3563 15.7842 17.5 15.4374 17.5 15.0757V7.65149"
+                               stroke="#74808B" stroke-miterlimit="10" stroke-linecap="square" />
+                           <path
+                               d="M17.5 7.57572V5.53026C17.5 5.1686 17.3563 4.82176 17.1006 4.56603C16.8449 4.31029 16.498 4.16663 16.1364 4.16663H3.86364C3.50198 4.16663 3.15513 4.31029 2.8994 4.56603C2.64367 4.82176 2.5 5.1686 2.5 5.53026V7.57572L10 10.8333L17.5 7.57572Z"
+                               stroke="#74808B" stroke-miterlimit="10" stroke-linecap="square" />
+                       </svg>
+
+                   </div>
+               </div>
+               <div class="page-card-actions">
+                   <button class="btn btn-sm btn-primary btn-block btn-forgot"
+                       type="submit">{{ _("Reset Password") }}</button>
+                   <p class="text-center sign-up-message">
+                       <a href="#login">{{ _("Back to Login") }}</a>
+                   </p>
+               </div>
+
+           </form>
+       </div>
+   </section> -->
+
+   <!-- <section class='for-login-with-email-link'>
+           {{ logo_section(_('Login with Email Link')) }}
+       <div class="login-content page-card">
+           <form class="form-signin form-login-with-email-link hide" role="form">
+               <div class="page-card-body">
+                   <div class="email-field">
+                       <input type="email" id="login_with_email_link_email" class="form-control"
+                           placeholder="{{ _('Email Address') }}" required autofocus autocomplete="username">
+                       <svg class="field-icon email-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"
+                           xmlns="http://www.w3.org/2000/svg">
+                           <path
+                               d="M2.5 7.65149V15.0757C2.5 15.4374 2.64367 15.7842 2.8994 16.04C3.15513 16.2957 3.50198 16.4394 3.86364 16.4394H16.1364C16.498 16.4394 16.8449 16.2957 17.1006 16.04C17.3563 15.7842 17.5 15.4374 17.5 15.0757V7.65149"
+                               stroke="#74808B" stroke-miterlimit="10" stroke-linecap="square" />
+                           <path
+                               d="M17.5 7.57572V5.53026C17.5 5.1686 17.3563 4.82176 17.1006 4.56603C16.8449 4.31029 16.498 4.16663 16.1364 4.16663H3.86364C3.50198 4.16663 3.15513 4.31029 2.8994 4.56603C2.64367 4.82176 2.5 5.1686 2.5 5.53026V7.57572L10 10.8333L17.5 7.57572Z"
+                               stroke="#74808B" stroke-miterlimit="10" stroke-linecap="square" />
+                       </svg>
+                   </div>
+               </div>
+               <div class="page-card-actions">
+                   <button class="btn btn-sm btn-primary btn-block btn-login-with-email-link"
+                       type="submit">{{ _("Send login link") }}</button>
+                   <p class="text-center sign-up-message">
+                       <a href="#login">{{ _("Back to Login") }}</a>
+                   </p>
+               </div>
+           </form>
+       </div>
+   </section>
+</div> -->
+{% endblock %}
+
+{% block script %}
+<script>
+{% include "templates/includes/login/login.js" %}
+</script>
+{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+

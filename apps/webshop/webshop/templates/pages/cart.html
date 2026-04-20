@@ -1,0 +1,1460 @@
+{% extends "templates/web.html" %}
+{% block title %}{{ _("Giỏ hàng") }}{% endblock %}
+
+{% block header %}
+<!-- <h3 class="shopping-cart-header mt-2 mb-6">{{ _("Giỏ  1hàng của bạn") }}</h3> -->
+{% endblock %}
+
+{% block page_content %}
+{% from "templates/includes/macros.html" import item_name_and_description %}
+
+{% if doc.items %}
+<div class="cart-container">
+  <div class="row m-0">
+    <!-- Giỏ hàng -->
+    <div class="col-md-8">
+      <div class="frappe-card p-5 mb-4">
+        <div class="cart-items-header">{{ _('Sản phẩm trong giỏ') }}</div>
+        <table class="table mt-3 cart-table">
+          <thead>
+            <tr>
+              <th>{{ _('Sản phẩm') }}</th>
+              <th width="20%">{{ _('Số lượng') }}</th>
+              {% if cart_settings.enable_checkout or cart_settings.show_price_in_quotation %}
+              <th width="20%" class="text-right">{{ _('Thành tiền') }}</th>
+              {% endif %}
+              <th width="10%"></th>
+            </tr>
+          </thead>
+          <tbody class="cart-items">
+            {% include "templates/includes/cart/cart_items.html" %}
+          </tbody>
+          {% if cart_settings.enable_checkout or cart_settings.show_price_in_quotation %}
+          <tfoot class="cart-tax-items">
+            {% include "templates/includes/cart/cart_items_total.html" %}
+          </tfoot>
+          {% endif %}
+        </table>
+
+        <div class="row mt-2">
+          <div class="col-3">
+            <a class="btn btn-outline-primary font-md" href="/orders-list">{{ _('Đơn hàng cũ') }}</a>
+          </div>
+          <div class="col-9 text-end">
+            <a class="btn btn-outline-primary font-md" href="/home">{{ _('Tiếp tục mua sắm') }}</a>
+          </div>
+        </div>
+      </div>
+      <!-- 🔍 Add note -->
+    <div class="frappe-card p-5 customer-card-container">
+      <h5 class="summary-title">{{ _("Nhập ghi chú") }}</h5>
+          <textarea 
+            id="cartNote"
+            class="form-control" 
+            rows="1" 
+            placeholder="{{ _('Nhập ghi chú') }}"
+            data-prev-value="">{{ doc.custom_note or '' }}</textarea>
+    </div>
+    <!-- 🔍 end Add note -->
+    </div>
+    
+    <!-- Tóm tắt & chọn khách hàng -->
+    <div class="col-md-4">
+      <div class="frappe-card p-5 customer-card-container">
+        <h5 class="summary-title">{{ _("Tóm tắt đơn hàng") }}</h5>
+        
+        <!-- 💰 Phần chiết khấu -->
+        <div class="discount-section mb-3">
+          <h6 class="discount-title">{{ _("Chiết khấu") }}</h6>
+          
+          <!-- Hiển thị chiết khấu hiện tại -->
+          {% if doc.additional_discount_percentage %}
+          <div class="current-discount mb-2">
+            <div class="discount-display">
+              <span class="discount-text">Chiết khấu: {{ doc.additional_discount_percentage }}%</span>
+              <button id="removeDiscountBtn" class="btn-remove-discount" title="Xóa chiết khấu">
+                <span>×</span>
+              </button>
+            </div>
+          </div>
+          {% endif %}
+          
+          <!-- Form nhập chiết khấu -->
+          <div class="discount-input-section" {% if doc.additional_discount_percentage %}style="display:none"{% endif %}>
+            <div class="input-group">
+              <input 
+                type="number" 
+                id="discountInput" 
+                class="form-control discount-input" 
+                placeholder="{{ _('Nhập % chiết khấu...') }}"
+                min="0" 
+                max="100" 
+                step="0.01"
+                autocomplete="off"
+              />
+              <span class="input-group-text">%</span>
+              <button id="applyDiscountBtn" class="btn btn-discount-apply">
+                {{ _("Áp dụng") }}
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 🔍 Tìm kiếm khách hàng -->
+        <div class="customer-selection-section mt-4" style="padding-bottom:25px; border-bottom: 1px solid var(--gray);">
+          <h6 class="customer-selection-title">{{ _("Chọn khách hàng") }}</h6>
+          
+          <!-- Hiển thị khách hàng đã chọn -->
+          <div id="selectedCustomerDisplay" class="selected-customer-display" style="display:none;">
+            <div class="selected-customer-info">
+              <div class="selected-customer-name"></div>
+              <button id="clearCustomerBtn" class="btn-clear-customer" title="Xóa chọn khách hàng">
+                <span>×</span>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Form tìm kiếm khách hàng -->
+          <div id="customerSearchForm" class="customer-search-container">
+            <input
+              type="text"
+              id="customerSearch"
+              class="form-control customer-search-input"
+              placeholder="{{ _('Tìm kiếm khách hàng...') }}"
+              autocomplete="off"
+            />
+            <div id="customerSuggestions" class="customer-suggestions"></div>
+          </div>
+          
+          <input type="hidden" id="selectedCustomerId" name="customer" value="">
+        </div>
+        {% include "templates/includes/cart/cart_payment_summary.html" %}
+        {% include "templates/includes/cart/place_order.html" %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="cart-empty frappe-card text-center p-5">
+  <img src="/assets/webshop/images/cart-empty-state.png" alt="Giỏ hàng trống" width="180" class="mb-3">
+  <p class="cart-empty-message">{{ _('Giỏ hàng của bạn đang trống') }}</p>
+  <a class="btn btn-outline-primary" href="/all-products">{{ _('Tiếp tục mua sắm') }}</a>
+</div>
+{% endif %}
+
+<!-- 🔍 Script tìm kiếm khách hàng & chiết khấu -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  // 💰 Xử lý chiết khấu
+  setupDiscountHandling();
+  
+  // 🔍 Xử lý tìm kiếm khách hàng
+  setupCustomerSearch();
+  
+  // 📝 Xử lý note
+  setupNoteHandling();
+});
+
+// 💰 Function xử lý chiết khấu
+function setupDiscountHandling() {
+  const discountInput = document.getElementById("discountInput");
+  const applyDiscountBtn = document.getElementById("applyDiscountBtn");
+  const removeDiscountBtn = document.getElementById("removeDiscountBtn");
+  
+  if (applyDiscountBtn) {
+    applyDiscountBtn.addEventListener("click", applyDiscount);
+  }
+  
+  if (discountInput) {
+    discountInput.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") {
+        applyDiscount();
+      }
+    });
+  }
+  
+  if (removeDiscountBtn) {
+    removeDiscountBtn.addEventListener("click", removeDiscount);
+  }
+}
+
+// Function áp dụng chiết khấu
+async function applyDiscount() {
+  const discountInput = document.getElementById("discountInput");
+  const applyDiscountBtn = document.getElementById("applyDiscountBtn");
+  
+  if (!discountInput || !applyDiscountBtn) return;
+  
+  const discountValue = parseFloat(discountInput.value);
+  
+  if (isNaN(discountValue) || discountValue < 0 || discountValue > 100) {
+    showAlert("Vui lòng nhập % chiết khấu từ 0 đến 100", "error");
+    return;
+  }
+  
+  try {
+    // Hiển thị loading
+    applyDiscountBtn.disabled = true;
+    applyDiscountBtn.innerHTML = "Đang áp dụng...";
+    
+    // Gọi API áp dụng chiết khấu
+    const result = await frappe.call({
+      method: "webshop.webshop.shopping_cart.cart.apply_discount_percentage",
+      args: {
+        discount_percentage: discountValue
+      },
+      freeze: true
+    });
+    
+    if (result.message) {
+      showAlert(`Đã áp dụng chiết khấu ${discountValue}%`, "success");
+      
+      // Reload trang để cập nhật giá
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    }
+    
+  } catch (err) {
+    console.error("❌ Lỗi áp dụng chiết khấu:", err);
+    let errorMsg = "Không thể áp dụng chiết khấu";
+    
+    if (err.message) {
+      errorMsg = err.message;
+    } else if (err._server_messages) {
+      try {
+        const messages = JSON.parse(err._server_messages);
+        if (messages && messages.length > 0) {
+          const message = JSON.parse(messages[0]);
+          errorMsg = message.message || errorMsg;
+        }
+      } catch(e) {
+        console.log("Parse error:", e);
+      }
+    }
+    
+    showAlert(errorMsg, "error");
+  } finally {
+    // Khôi phục nút
+    applyDiscountBtn.disabled = false;
+    applyDiscountBtn.innerHTML = "Áp dụng";
+  }
+}
+
+// Function xóa chiết khấu
+async function removeDiscount() {
+  try {
+    const result = await frappe.call({
+      method: "webshop.webshop.shopping_cart.cart.remove_discount",
+      freeze: true
+    });
+    
+    if (result.message) {
+      showAlert("Đã xóa chiết khấu", "success");
+      
+      // Reload trang để cập nhật giá
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    }
+    
+  } catch (err) {
+    console.error("❌ Lỗi xóa chiết khấu:", err);
+    showAlert("Không thể xóa chiết khấu", "error");
+  }
+}
+
+// 🔍 Function xử lý tìm kiếm khách hàng  
+function setupCustomerSearch() {
+  const input = document.getElementById("customerSearch");
+  const box = document.getElementById("customerSuggestions");
+  const hidden = document.getElementById("selectedCustomerId");
+  const updateBtn = document.getElementById("updateCartBtn");
+  const selectedDisplay = document.getElementById("selectedCustomerDisplay");
+  const searchForm = document.getElementById("customerSearchForm");
+  const clearBtn = document.getElementById("clearCustomerBtn");
+  const customerNameDiv = selectedDisplay ? selectedDisplay.querySelector(".selected-customer-name") : null;
+  
+  if (!input || !box) return;
+
+  let delay;
+  let selectedCustomer = null;
+
+  // Load khách hàng hiện tại khi trang load
+  loadCurrentSelectedCustomer();
+
+  // Thêm sự kiện cho nút clear
+  if (clearBtn) {
+    clearBtn.addEventListener("click", clearSelectedCustomer);
+  }
+  
+  input.addEventListener("input", function (e) {
+    const keyword = e.target.value.trim();
+    clearTimeout(delay);
+    
+    // 🔥 Cho phép search ngay cả khi chưa nhập gì (để hiển thị tất cả)
+    delay = setTimeout(() => searchCustomers(keyword), 300);
+  });
+  
+  // 🔥 Thêm sự kiện focus để hiển thị danh sách khi click vào input
+  input.addEventListener("focus", function() {
+    const keyword = input.value.trim();
+    searchCustomers(keyword);
+  });
+
+  async function searchCustomers(keyword) {
+    console.log("🔍 Đang tìm:", keyword);
+    
+    // 🔥 Hiển thị loading state
+    box.innerHTML = `<div class='customer-suggestion-item text-center'><i>Đang tìm...</i></div>`;
+    box.style.display = "block";
+    
+    try {
+      // 🔥 Gọi API mới của webshop để lọc theo nhân viên phụ trách
+      const res = await frappe.call({
+        method: "webshop.webshop.shopping_cart.cart.search_customers_by_staff",
+        args: {
+          keyword: keyword
+        }
+      });
+      
+      const list = res.message || [];
+      
+      console.log("📋 Kết quả tìm kiếm:", list.length, "khách hàng");
+      
+      if (list.length === 0) {
+        box.innerHTML = `<div class='customer-suggestion-item text-center text-muted'>Không tìm thấy khách hàng</div>`;
+        box.style.display = "block";
+        return;
+      }
+      
+      box.innerHTML = list.map(c => `
+        <div class="customer-suggestion-item" data-id="${c.name}">
+          <div class="customer-suggestion-name">${c.customer_name}</div>
+          ${c.mobile_no ? `<div class="customer-suggestion-email">${c.mobile_no}</div>` : ""}
+          ${c.email_id ? `<div class="customer-suggestion-email">${c.email_id}</div>` : ""}
+        </div>
+      `).join("");
+      
+      // 🔥 Đảm bảo hiển thị
+      box.style.display = "block";
+      console.log("✅ Dropdown đã hiển thị với", list.length, "kết quả");
+      
+      // Add click handlers
+      box.querySelectorAll(".customer-suggestion-item").forEach(item => {
+        item.addEventListener("click", async () => {
+          const customerName = item.querySelector(".customer-suggestion-name").textContent;
+          const customerId = item.dataset.id;
+          
+          // Lưu thông tin khách hàng đã chọn
+          selectedCustomer = {
+            id: customerId,
+            name: customerName
+          };
+          
+          // Ẩn dropdown và clear input
+          box.style.display = "none";
+          input.value = "";
+          
+          console.log("✅ Đã chọn khách hàng:", customerName, "(ID:", customerId, ")");
+          
+          // 🔥 Tự động cập nhật giỏ hàng ngay
+          await updateCartWithCustomer();
+        });
+      });
+      
+    } catch (err) {
+      console.error("❌ Lỗi tìm khách hàng:", err);
+      box.innerHTML = `<div class='customer-suggestion-item text-center text-danger'>Lỗi kết nối. Thử lại.</div>`;
+      box.style.display = "block";
+    }
+  }
+
+  // Hàm hiển thị thông báo - định nghĩa đầu tiên để có thể sử dụng ở mọi nơi
+  function showAlert(message, type = 'info') {
+    // Tạo alert đơn giản
+    const alertDiv = document.createElement('div');
+    const alertClass = type === 'success' ? 'alert-success' : 
+                       type === 'error' ? 'alert-danger' : 'alert-info';
+    alertDiv.className = `alert ${alertClass} mt-2`;
+    alertDiv.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      max-width: 300px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    `;
+    alertDiv.textContent = message;
+    
+    document.body.appendChild(alertDiv);
+    
+    // Fade in
+    setTimeout(() => alertDiv.style.opacity = '1', 100);
+    
+    // Fade out và remove
+    setTimeout(() => {
+      alertDiv.style.opacity = '0';
+      setTimeout(() => document.body.removeChild(alertDiv), 300);
+    }, 3000);
+  }
+
+  // Hàm cập nhật giỏ hàng với khách hàng đã chọn
+  async function updateCartWithCustomer() {
+    if (!selectedCustomer) return;
+    
+    try {
+      // Hiển thị thông báo loading
+      showAlert('Đang cập nhật khách hàng...', 'info');
+      
+      // Sử dụng API của webshop thay vì erpnext
+      const customerUpdateData = {
+        item_code: "",
+        qty: 0,
+        customer: selectedCustomer.id
+      };
+      
+      // 1. Cập nhật khách hàng sử dụng frappe.call
+      await frappe.call({
+        method: "webshop.webshop.shopping_cart.cart.update_cart",
+        args: customerUpdateData,
+        freeze: true,
+        callback: function(r) {
+          console.log("✅ Customer update successful", r);
+        },
+        error: function(r) {
+          console.error("❌ Customer update failed", r);
+          throw new Error("Customer update failed");
+        }
+      });
+      
+      // 2. Lấy và cập nhật địa chỉ
+      try {
+        const customerAddresses = await frappe.call({
+          method: "webshop.webshop.shopping_cart.cart.get_customer_addresses",
+          args: {
+            customer: selectedCustomer.id
+          }
+        });
+        
+        const addresses = customerAddresses.message || [];
+        console.log("📍 Addresses found:", addresses);
+        
+        if (addresses && addresses.length > 0) {
+          const defaultAddress = addresses.find(addr => addr.is_primary_address) || addresses[0];
+          
+          // Update địa chỉ
+          await frappe.call({
+            method: "webshop.webshop.shopping_cart.cart.update_cart",
+            args: {
+              item_code: "",
+              qty: 0,
+              shipping_address_name: defaultAddress.name
+            },
+            freeze: true
+          });
+          
+          console.log("📍 Address update successful");
+        }
+      } catch (addrError) {
+        console.error("⚠️ Address update error:", addrError);
+        // Continue even if address update fails
+      }
+      
+      // 3. Hiển thị thông báo thành công
+      showAlert(`Đã chọn khách hàng: ${selectedCustomer.name}`, 'success');
+      
+      // 4. Reload trang để hiển thị thông tin mới
+      setTimeout(function() {
+        window.location.reload();
+      }, 1000);
+      
+    } catch (err) {
+      console.error("❌ Lỗi cập nhật giỏ hàng:", err);
+      showAlert(`Lỗi cập nhật: ${err.message || "Không xác định"}`, 'error');
+    }
+  }
+  
+  // Function để load khách hàng hiện tại từ backend
+  async function loadCurrentSelectedCustomer() {
+    try {
+      const result = await frappe.call({
+        method: "webshop.webshop.shopping_cart.cart.get_selected_customer"
+      });
+      
+      if (result.message) {
+        selectedCustomer = result.message;
+        showSelectedCustomer();
+        console.log("✅ Loaded current customer:", selectedCustomer);
+      }
+    } catch (err) {
+      console.log("ℹ️ No current customer selected");
+    }
+  }
+  
+  // Function để hiển thị khách hàng đã chọn
+  function showSelectedCustomer() {
+    if (selectedCustomer && customerNameDiv && selectedDisplay && searchForm) {
+      customerNameDiv.textContent = selectedCustomer.name;
+      hidden.value = selectedCustomer.id;
+      
+      // Hiển thị phần selected customer, ẩn form search
+      selectedDisplay.style.display = "block";
+      searchForm.style.display = "none";
+    }
+  }
+  
+  // Function để xóa chọn khách hàng
+  async function clearSelectedCustomer() {
+    try {
+      // Hiển thị thông báo loading
+      showAlert('Đang xóa khách hàng...', 'info');
+      
+      // 1. Xóa khách hàng khỏi giỏ hàng
+      const customerResult = await frappe.call({
+        method: "webshop.webshop.shopping_cart.cart.update_cart",
+        args: {
+          item_code: "",
+          qty: 0,
+          customer: ""
+        },
+        freeze: true
+      });
+      
+      console.log("✅ Customer cleared:", customerResult);
+      
+      // 2. Xóa địa chỉ giao hàng
+      try {
+        const addressResult = await frappe.call({
+          method: "webshop.webshop.shopping_cart.cart.update_cart",
+          args: {
+            item_code: "",
+            qty: 0,
+            shipping_address_name: ""
+          },
+          freeze: true
+        });
+        console.log("✅ Address cleared:", addressResult);
+      } catch (addrError) {
+        console.error("⚠️ Address clear error:", addrError);
+      }
+      
+      selectedCustomer = null;
+      hidden.value = "";
+      
+      // Ẩn phần selected customer, hiển thị form search
+      if (selectedDisplay && searchForm) {
+        selectedDisplay.style.display = "none";
+        searchForm.style.display = "block";
+      }
+      
+      // Clear input
+      input.value = "";
+      
+      console.log("✅ Cleared customer selection - reloading page...");
+      showAlert("Đã xóa khách hàng", 'success');
+      
+      // Đợi một chút để đảm bảo backend đã lưu xong rồi mới reload
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
+      
+    } catch (err) {
+      console.error("❌ Lỗi xóa khách hàng:", err);
+      let errorMsg = "Không thể xóa khách hàng";
+      if (err.message) {
+        errorMsg = err.message;
+      }
+      showAlert(errorMsg, 'error');
+    }
+  }
+  
+  // Click outside to hide
+  document.addEventListener("click", e => {
+    if (!e.target.closest(".customer-search-container")) {
+      box.style.display = "none";
+    }
+  });
+}
+
+// 📝 Function xử lý note
+function setupNoteHandling() {
+  const noteTextarea = document.getElementById('cartNote');
+  if (!noteTextarea) return;
+
+  let typingTimer;
+  const doneTypingInterval = 1000; // Đợi 1 giây sau khi người dùng ngừng gõ
+
+  noteTextarea.addEventListener('input', function() {
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => {
+      const newNote = this.value.trim();
+      const prevNote = this.getAttribute('data-prev-value');
+      
+      if (newNote === prevNote) return;
+      
+      updateNote(newNote);
+    }, doneTypingInterval);
+  });
+}
+
+// Function cập nhật note
+async function updateNote(note) {
+  try {
+    const result = await frappe.call({
+      method: "webshop.webshop.shopping_cart.cart.update_cart",
+      args: {
+        item_code: "",
+        qty: 0,
+        custom_note: note
+      },
+      freeze: true
+    });
+
+    if (result.message) {
+      const noteTextarea = document.getElementById('cartNote');
+      noteTextarea.setAttribute('data-prev-value', note);
+      showAlert('Đã cập nhật ghi chú', 'success');
+    }
+  } catch (err) {
+    console.error("❌ Lỗi cập nhật ghi chú:", err);
+    showAlert('Không thể cập nhật ghi chú', 'error');
+  }
+}
+
+// Hàm hiển thị thông báo
+function showAlert(message, type = 'info') {
+  // Tạo alert đơn giản
+  const alertDiv = document.createElement('div');
+  const alertClass = type === 'success' ? 'alert-success' : 
+                     type === 'error' ? 'alert-danger' : 'alert-info';
+  alertDiv.className = `alert ${alertClass} mt-2`;
+  alertDiv.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    max-width: 300px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  `;
+  alertDiv.textContent = message;
+  
+  document.body.appendChild(alertDiv);
+  
+  // Fade in
+  setTimeout(() => alertDiv.style.opacity = '1', 100);
+  
+  // Fade out và remove
+  setTimeout(() => {
+    alertDiv.style.opacity = '0';
+    setTimeout(() => document.body.removeChild(alertDiv), 300);
+  }, 3000);
+}
+</script>
+
+<!-- 💖 CSS màu hồng của bạn -->
+
+<style>
+/* Biến màu chính - dùng lại từ trang chủ */
+:root {
+  --primary: #ff469e;
+  --primary-dark: #fa3d99;
+  --black: #111;
+  --gray: #e9e9e9;
+  --text: #111;
+  --muted: #666;
+  --bg: rgb(245, 245, 250);
+  --card: #f7f7f7;
+  --radius: 18px;
+}
+
+/* Style chung cho trang giỏ hàng */
+.cart-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Header */
+.shopping-cart-header {
+  text-align: center;
+  font-weight: 700;
+  margin: 20px 0 30px;
+  color: var(--black);
+  font-size: 28px;
+}
+
+/* Thẻ frappe-card */
+.frappe-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border: 1px solid var(--gray);
+  /* overflow: hidden; */ /* ❌ Xóa dòng này để không cắt dropdown */
+}
+
+/* Header cho mục sản phẩm */
+.cart-items-header {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--black);
+  /* padding-bottom: 10px; */
+  /* border-bottom: 1px solid var(--gray); */
+}
+
+/* Bảng giỏ hàng */
+.cart-table {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.cart-table th {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 14px;
+  border-bottom: 1px solid var(--gray);
+  padding: 12px 8px;
+}
+
+.cart-table td {
+  vertical-align: middle;
+  padding: 15px 8px;
+  border-bottom: 1px solid var(--gray);
+}
+
+/* Style sản phẩm trong giỏ hàng */
+.cart-items .cart-items-image img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  background: #f9f9f9;
+  border-radius: 10px;
+}
+
+.cart-items .item-name {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+
+.cart-items .item-description {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Ô nhập số lượng */
+.cart-items .cart-item-qty {
+  width: 70px;
+  text-align: center;
+  padding: 5px;
+  border: 1px solid var(--gray);
+  border-radius: 6px;
+}
+
+/* Nút xóa sản phẩm */
+.cart-items .remove-item {
+  color: #e63946;
+  cursor: pointer;
+  transition: color 0.3s;
+}
+
+.cart-items .remove-item:hover {
+  color: #c1121f;
+}
+
+/* Style tổng tiền */
+.cart-tax-items {
+  font-weight: 600;
+}
+
+.cart-tax-items th, .cart-tax-items td {
+  padding: 10px 8px;
+}
+
+.cart-grand-total {
+  color: var(--primary);
+  font-size: 18px;
+}
+
+/* Style nút */
+.btn-outline-primary {
+  background-color: white;
+  color: var(--primary) !important;
+  border: 1px solid var(--primary) !important;
+  transition: all 0.3s;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--primary) !important;
+  color: white !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(255, 70, 158, 0.2);
+}
+
+.btn-primary {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: white !important;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(255, 70, 158, 0.3);
+}
+
+/* Phần áp dụng mã giảm giá */
+.coupon-container {
+  border: 1px solid var(--gray);
+  border-radius: 10px;
+  padding: 10px;
+  background: white;
+}
+
+.txtcoupon {
+  border-radius: 6px;
+  border: 1px solid #eee;
+  padding: 8px 12px;
+  background: #f9f9f9;
+}
+
+.bt-coupon {
+  background: var(--primary);
+  color: white !important;
+  border: none;
+  border-radius: 6px;
+  transition: all 0.3s;
+  padding: 8px 16px;
+  font-weight: 500;
+}
+
+.bt-coupon:hover {
+  background: var(--primary-dark);
+}
+
+/* Tóm tắt thanh toán */
+.payment-summary {
+  margin-bottom: 20px;
+}
+
+.summary-title {
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: var(--black);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--gray);
+}
+
+.payment-summary-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+.payment-summary-item.grand-total {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--primary);
+  border-top: 1px solid var(--gray);
+  padding-top: 15px;
+  margin-top: 5px;
+}
+
+/* Địa chỉ */
+.cart-address-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: var(--text);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--gray);
+}
+
+.cart-address {
+  padding: 15px;
+  background: #fff;
+  border-radius: 10px;
+  margin-bottom: 15px;
+}
+
+.address-card {
+  background: white;
+  border-radius: 10px;
+  border: 1px solid var(--gray);
+  padding: 15px;
+  margin-bottom: 15px;
+  transition: all 0.3s;
+}
+
+.address-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+}
+
+.address-card.active {
+  border: 2px solid var(--primary);
+}
+
+/* Style cho trang giỏ hàng trống */
+.cart-empty {
+  text-align: center;
+  padding: 60px 20px;
+  max-width: 500px;
+  margin: 40px auto;
+}
+
+.cart-empty-state img {
+  max-width: 200px;
+  margin: 0 auto;
+}
+
+.cart-empty-message {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 20px 0;
+}
+
+.cart-empty .btn {
+  padding: 12px 24px;
+  margin-top: 20px;
+  border: 2px solid var(--primary);
+  color: var(--primary);
+  font-weight: 600;
+  transition: all 0.3s;
+  border-radius: 10px;
+}
+
+.cart-empty .btn:hover {
+  background: var(--primary);
+  color: white;
+}
+
+/* Customer Selection Styles */
+.customer-selection-section {
+  border-top: 1px solid var(--gray);
+  padding-top: 15px;
+  /* 🔥 Thêm position relative và z-index cao hơn */
+  position: relative;
+  z-index: 1001;
+}
+
+.customer-selection-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--black);
+  font-size: 14px;
+}
+
+.customer-search-container {
+  position: relative;
+  /* 🔥 Đảm bảo z-index cao */
+  z-index: 1002;
+}
+
+.customer-search-input {
+  border: 1px solid var(--gray);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  width: 100%;
+  transition: border-color 0.3s;
+}
+
+.customer-search-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(255, 70, 158, 0.1);
+}
+
+.customer-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--gray);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  /* 🔥 Z-index cao nhất để đè lên mọi thứ */
+  z-index: 1003;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  /* 🔥 Đảm bảo hiển thị đầy đủ */
+  display: none;
+}
+
+.customer-suggestion-item {
+  padding: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
+}
+
+.customer-suggestion-item:hover {
+  background-color: #f8f9fa;
+}
+
+.customer-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.customer-suggestion-name {
+  font-weight: 500;
+  color: var(--black);
+  font-size: 14px;
+}
+
+.customer-suggestion-email {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.selected-customer-display {
+  margin-bottom: 15px;
+}
+
+.selected-customer-info {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 2px solid var(--primary);
+  border-radius: 10px;
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+
+.selected-customer-info::before {
+  content: "✓";
+  position: absolute;
+  top: -8px;
+  left: 15px;
+  background: var(--primary);
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.selected-customer-name {
+  font-weight: 600;
+  color: var(--black);
+  font-size: 16px;
+  margin: 0;
+}
+
+.btn-clear-customer {
+  background: #fff;
+  border: 2px solid #dc3545;
+  color: #dc3545;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  font-size: 16px;
+  font-weight: bold;
+  position: relative;
+}
+
+.btn-clear-customer span {
+  font-size: 20px;
+  line-height: 1;
+  font-weight: bold;
+  transform: translateY(-1px);
+}
+
+.btn-clear-customer:hover {
+  background: #dc3545;
+  color: white;
+  transform: scale(1.1);
+}
+
+.selected-customer-card {
+  background: #f8f9fa;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.customer-info {
+  flex: 1;
+}
+
+.customer-name {
+  font-weight: 600;
+  color: var(--black);
+  font-size: 14px;
+}
+
+.customer-details {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.btn-remove-customer {
+  background: none;
+  border: none;
+  color: #e63946;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.btn-remove-customer:hover {
+  background-color: rgba(230, 57, 70, 0.1);
+}
+
+/* 💰 CSS cho phần chiết khấu */
+.discount-section {
+  margin-bottom: 15px;
+}
+
+.discount-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--black);
+  font-size: 14px;
+}
+
+.discount-input-section {
+  margin-top: 10px;
+}
+
+.input-group {
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--gray);
+}
+
+.discount-input {
+  flex: 1;
+  border: none;
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+  background: white;
+}
+
+.discount-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.input-group-text {
+  background: #f8f9fa;
+  border: none;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+}
+
+.btn-discount-apply {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.btn-discount-apply:hover {
+  background: var(--primary-dark);
+}
+
+.btn-discount-apply:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.current-discount {
+  margin-bottom: 10px;
+}
+
+.discount-display {
+  background: linear-gradient(135deg, #e8f5e8 0%, #d4f5d4 100%);
+  border: 2px solid var(--primary);
+  border-radius: 8px;
+  padding: 12px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+}
+
+.discount-display::before {
+  content: "💰";
+  position: absolute;
+  top: -8px;
+  left: 15px;
+  background: var(--primary);
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+.discount-text {
+  font-weight: 600;
+  color: var(--primary);
+  font-size: 14px;
+  flex: 1;
+}
+
+.btn-remove-discount {
+  background: #fff;
+  border: 2px solid #dc3545;
+  color: #dc3545;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.btn-remove-discount span {
+  font-size: 16px;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.btn-remove-discount:hover {
+  background: #dc3545;
+  color: white;
+  transform: scale(1.1);
+}
+
+/* Responsive */
+@media (max-width: 767px) {
+  .column-sm-view {
+    display: none;
+  }
+
+  .cart-items .cart-items-image img {
+    width: 60px;
+    height: 60px;
+  }
+
+  .cart-items-table-header {
+    display: none;
+  }
+  
+  .shopping-cart-header {
+    font-size: 22px;
+    margin: 15px 0;
+  }
+  
+  .payment-summary-item {
+    font-size: 13px;
+  }
+  
+  .payment-summary-item.grand-total {
+    font-size: 16px;
+  }
+  
+  /* Cải thiện layout trên mobile */
+  .cart-container .row {
+    flex-direction: column-reverse;
+  }
+  
+  .col-md-8, .col-md-4 {
+    padding: 0;
+  }
+  
+  .frappe-card {
+    padding: 15px !important;
+    margin-bottom: 15px;
+  }
+  
+  /* Thêm margin bottom cho phần payment summary */
+  .cart-payment-addresses .frappe-card {
+    margin-bottom: 15px;
+  }
+  
+  /* Cải thiện padding cho nút */
+  .btn {
+    padding: 8px 15px;
+    font-size: 14px;
+  }
+}
+
+/* Fix một số lỗi UI */
+.frappe-card.p-5 {
+  padding: 25px;
+}
+
+.place-order-container {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Terms and conditions container */
+.t-and-c-container {
+  padding: 20px;
+}
+
+.t-and-c-terms {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Cập nhật nút đặt hàng */
+.btn-place-order {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 15px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.btn-place-order:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 70, 158, 0.3);
+}
+
+/* Thêm chia sẻ trang cart */
+.share-cart {
+  margin-top: 15px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.share-cart a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.share-cart a:hover {
+  text-decoration: underline;
+}
+
+/* Cập nhật responsive nút trên mobile */
+@media (max-width: 575px) {
+  .place-order-container {
+    justify-content: center;
+    margin-top: 15px;
+  }
+  
+  .col-3, .col-9 {
+    flex: 0 0 100%;
+    max-width: 100%;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  
+  .row.mt-2 {
+    margin-top: 15px !important;
+  }
+  
+  .btn {
+    width: 100%;
+    margin: 5px 0;
+  }
+}
+
+/* Responsive cho discount */
+@media (max-width: 575px) {
+  .input-group {
+    flex-direction: row;
+    border-radius: 8px;
+  }
+  
+  .discount-input {
+    min-width: 0;
+    flex: 1;
+  }
+  
+  .input-group-text {
+    min-width: 40px;
+    justify-content: center;
+  }
+  
+  .btn-discount-apply {
+    min-width: 80px;
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+  
+  .discount-display {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+  
+  .btn-remove-discount {
+    align-self: flex-end;
+  }
+}
+
+/* Style cho dòng chiết khấu trong payment summary */
+.bill-label.text-success {
+  color: #28a745 !important;
+  font-weight: 500;
+}
+
+.bill-content.text-success {
+  color: #28a745 !important;
+  font-weight: 600;
+}
+
+/* Tăng cường hiển thị discount */
+.table tr:has(.text-success) {
+  background-color: rgba(40, 167, 69, 0.05);
+}
+
+.table tr:has(.text-success) td {
+  border-color: rgba(40, 167, 69, 0.1);
+}
+</style>
+{% endblock %}
